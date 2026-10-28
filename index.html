@@ -128,6 +128,8 @@
   .ojt-seg { display: inline-flex; border: 1px solid var(--color-border-line); border-radius: 999px; overflow: hidden; padding: 2px; gap: 2px; }
   .ojt-seg button { font: inherit; border: 0; border-radius: 999px; background: transparent; color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-md); cursor: pointer; transition: background .2s, color .2s; }
   .ojt-seg button[aria-pressed="true"] { background: var(--h); color: #fff; }
+  .ojt-select { flex: 0 1 16rem; cursor: pointer; }
+  .ojt-dialog header .ojt-note b { color: #fff; font-weight: 600; }
   .ojt-search { font: inherit; padding: var(--cds-pad-xs) var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-bg); color: var(--color-fg); min-width: 0; flex: 1 1 12rem; }
 
   /* Pop-up */
@@ -191,13 +193,19 @@
 
   <section class="ojt-card" id="todo">
     <h2>Pending OJT sign-offs</h2>
-    <p class="ojt-note">Active staff with a phase still to sign off, overdue first, then by due date. "Fill form" opens the OJT sign-off form with the employee's details and the phase already filled in. The store manager adds the cluster manager, trainer, concerns and confirmation, then submits.</p>
+    <p class="ojt-note">Active staff with a phase still to sign off, overdue first, then by due date. "Fill form" opens the OJT sign-off form with the employee's details, cluster manager and phase already filled in. The store manager adds the trainer, concerns and confirmation, then submits.</p>
+    <div class="ojt-tools">
+      <select class="ojt-search ojt-select" data-draw="cm-filter" data-source="staff" aria-label="Cluster manager"></select>
+      <span class="ojt-note">Showing <span data-draw="pending-shown" data-source="actions">—</span></span>
+    </div>
     <div class="ojt-scroll">
       <table data-source="actions" data-row-key="id">
         <thead><tr>
           <th data-field="id">Emp ID</th>
           <th data-field="name">Name</th>
           <th data-field="store">Store</th>
+          <th data-field="cm">CM</th>
+          <th data-field="rm">RM</th>
           <th data-field="phase">Phase to complete</th>
           <th data-field="due_label">Due by</th>
           <th data-field="status">Status</th>
@@ -257,6 +265,8 @@
         <thead><tr>
           <th data-field="store">Store</th>
           <th data-field="state">State</th>
+          <th data-field="cm">CM</th>
+          <th data-field="rm">RM</th>
           <th class="num" data-field="active">Active</th>
           <th class="num" data-field="ph1_done">Phase 1</th>
           <th class="num" data-field="ph2_done">Phase 2</th>
@@ -284,7 +294,8 @@
         <button type="button" data-emp="Left" aria-pressed="false">Left</button>
         <button type="button" data-emp="All" aria-pressed="false">Everyone</button>
       </div>
-      <input id="ojt-q" class="ojt-search" type="search" placeholder="Search name, ID or store" aria-label="Search staff">
+      <select class="ojt-search ojt-select" data-draw="cm-filter" data-source="staff" aria-label="Cluster manager"></select>
+      <input id="ojt-q" class="ojt-search" type="search" placeholder="Search name, ID, store, CM or RM" aria-label="Search staff">
       <span class="ojt-note">Showing <span data-draw="shown" data-source="staff">—</span></span>
     </div>
     <div class="ojt-scroll">
@@ -293,6 +304,8 @@
           <th data-field="id">Emp ID</th>
           <th data-field="name">Name</th>
           <th data-field="store">Store</th>
+          <th data-field="cm">CM</th>
+          <th data-field="rm">RM</th>
           <th data-field="joined">Joined</th>
           <th data-field="ph1">Phase 1</th>
           <th data-field="ph2">Phase 2</th>
@@ -311,6 +324,7 @@
         <div>
           <h3 id="ojt-m-name" data-draw="emp" data-part="name">—</h3>
           <p class="ojt-note" data-draw="emp" data-part="meta">—</p>
+          <p class="ojt-note">CM <b data-draw="emp" data-part="cm">—</b> · RM <b data-draw="emp" data-part="rm">—</b></p>
           <p class="ojt-note">Joined <span data-draw="emp" data-part="joined">—</span></p>
         </div>
         <button type="button" class="ojt-btn" id="ojt-close" aria-label="Close">Close</button>
@@ -405,7 +419,7 @@
     fn: (staff) => {
       const m = new Map();
       staff.filter((r) => r.employment === 'Active').forEach((r) => {
-        const s = m.get(r.store) || {store: r.store, state: r.state, active: 0, ph1_done: 0, ph2_done: 0, asmt_done: 0, ph3_done: 0, ph4_done: 0, overdue: 0};
+        const s = m.get(r.store) || {store: r.store, state: r.state, cm: r.cm || '', rm: r.rm || '', active: 0, ph1_done: 0, ph2_done: 0, asmt_done: 0, ph3_done: 0, ph4_done: 0, overdue: 0};
         s.active += 1;
         [['ph1', 'ph1_done'], ['ph2', 'ph2_done'], ['assessment', 'asmt_done'], ['ph3', 'ph3_done'], ['ph4', 'ph4_done']].forEach(([k, f]) => {
           if (r[k] === 'Done') s[f] += 1;
@@ -433,7 +447,7 @@
         const joined = new Date(Date.UTC(+yy, M[mon], +dd));
         const due = new Date(Date.UTC(+yy, M[mon], +dd + p[3] - 1));
         rows.push({
-          id: r.id, name: r.name, store: r.store, state: r.state, city: r.city,
+          id: r.id, name: r.name, store: r.store, state: r.state, city: r.city, cm: r.cm || '', rm: r.rm || '',
           phase: p[1], form_phase: p[2], status: r[p[0]],
           due: due.toISOString().slice(0, 10),
           due_label: due.getUTCDate() + ' ' + Object.keys(M)[due.getUTCMonth()] + ' ' + due.getUTCFullYear(),
@@ -453,6 +467,7 @@
       'entry.561229468': r.name, 'entry.2111129689': r.id, 'entry.815396474': r.joined_iso,
       'entry.99316554': r.store, 'entry.683437075': r.city, 'entry.1144287292': 'Pavan R',
     });
+    if (r.cm) q.set('entry.2099394519', r.cm);
     if (r.form_phase) q.set('entry.527990938', r.form_phase);
     return FORM + '?' + q;
   };
@@ -465,7 +480,7 @@
   };
 
   // Page-local view state shared by the drawings below.
-  window.__ojt = {state: 'All', emp: 'Active', q: '', sel: null};
+  window.__ojt = {state: 'All', emp: 'Active', q: '', cm: '', sel: null};
 
   const pillClass = (v) => 'ojt-pill ' + ({Done: 's-done', 'In progress': 's-progress', Overdue: 's-overdue'}[v] || 's-left');
   const pill = (v) => { const s = document.createElement('span'); s.className = pillClass(v); s.textContent = v; return s; };
@@ -508,17 +523,47 @@
     }
   });
 
-  dash.draw('action-rows', (tb) => {
+  // Cluster manager filter, shared by the pending and staff tables.
+  const NO_CM = '(not in reporting structure)';
+  const cmMatch = (r) => !window.__ojt.cm || (r.cm || NO_CM) === window.__ojt.cm;
+  const managerCell = (tr, v) => {
+    const td = tr.insertCell(); td.textContent = v;
+    if (!v) td.title = 'Store not found in the Retail Reporting Structure';
+    return td;
+  };
+  dash.draw('cm-filter', (sel) => {
+    const d = dash.data('staff');
+    const cms = d.status === 'ok' ? [...new Set(d.data.map((r) => r.cm || NO_CM))].sort() : [];
+    sel.replaceChildren(new Option('All cluster managers', ''), ...cms.map((c) => new Option(c, c)));
+    sel.value = window.__ojt.cm;
+    sel.onchange = () => {
+      window.__ojt.cm = sel.value;
+      ['cm-filter', 'action-rows', 'pending-shown', 'staff-rows', 'shown'].forEach((n) => dash.draw(n));
+    };
+  });
+
+  const visibleActions = () => {
     const d = dash.data('actions');
+    return d.status === 'ok' ? d.data.filter(cmMatch) : null;
+  };
+  dash.draw('pending-shown', (el) => {
+    const rows = visibleActions();
+    el.textContent = rows ? d3.format(',')(rows.length) + ' pending · ' + rows.filter((r) => r.status === 'Overdue').length + ' overdue' : '—';
+  });
+
+  dash.draw('action-rows', (tb) => {
+    const rows = visibleActions();
     tb.replaceChildren();
-    if (d.status !== 'ok') return;
-    d.data.forEach((r) => {
+    if (!rows) return;
+    rows.forEach((r) => {
       const tr = tb.insertRow();
       tr.className = 'ojt-row'; tr.tabIndex = 0;
       tr.setAttribute('aria-label', 'Open timeline for ' + r.name);
       tr.insertCell().textContent = r.id;
       personCell(tr, r.name);
       tr.insertCell().textContent = r.store;
+      managerCell(tr, r.cm);
+      managerCell(tr, r.rm);
       const ph = tr.insertCell(); ph.className = 'phase-cell'; ph.textContent = r.phase;
       ph.style.setProperty('--ph', PHASE_HUE[r.phase.split(' ·')[0]] || 'inherit');
       const due = tr.insertCell(); due.textContent = r.due_label;
@@ -550,9 +595,9 @@
     if (d.status !== 'ok') return;
     d.data.forEach((r) => {
       const tr = tb.insertRow();
-      ['store', 'state', 'active', 'ph1_done', 'ph2_done', 'asmt_done', 'ph3_done', 'ph4_done', 'overdue'].forEach((f, i) => {
+      ['store', 'state', 'cm', 'rm', 'active', 'ph1_done', 'ph2_done', 'asmt_done', 'ph3_done', 'ph4_done', 'overdue'].forEach((f, i) => {
         const td = tr.insertCell(); td.textContent = r[f];
-        if (i > 1) td.className = 'num';
+        if (i > 3) td.className = 'num';
         if (f === 'overdue' && r.overdue > 0) td.style.color = 'var(--color-bad)';
       });
     });
@@ -564,8 +609,8 @@
     const v = window.__ojt, q = v.q.trim().toLowerCase();
     return d.data.filter((r) =>
       (v.state === 'All' || r.state === v.state) &&
-      (v.emp === 'All' || r.employment === v.emp) &&
-      (!q || (r.name + ' ' + r.id + ' ' + r.store).toLowerCase().includes(q)));
+      (v.emp === 'All' || r.employment === v.emp) && cmMatch(r) &&
+      (!q || [r.name, r.id, r.store, r.cm, r.rm].join(' ').toLowerCase().includes(q)));
   };
 
   dash.draw('shown', (el) => {
@@ -583,7 +628,10 @@
       tr.setAttribute('aria-label', 'Open timeline for ' + r.name);
       tr.insertCell().textContent = r.id;
       personCell(tr, r.name);
-      ['store', 'joined'].forEach((f) => { tr.insertCell().textContent = r[f]; });
+      tr.insertCell().textContent = r.store;
+      managerCell(tr, r.cm);
+      managerCell(tr, r.rm);
+      tr.insertCell().textContent = r.joined;
       ['ph1', 'ph2', 'assessment', 'ph3', 'ph4'].forEach((f) => { tr.insertCell().append(pill(r[f])); });
       const open = () => window.__ojtOpen(r.id);
       tr.onclick = open;
@@ -606,6 +654,8 @@
     const joined = parse(r.joined);
     if (part === 'name') el.textContent = r.name;
     else if (part === 'meta') el.textContent = [r.id, r.store, r.state, r.designation].filter(Boolean).join(' · ');
+    else if (part === 'cm') el.textContent = r.cm || 'not listed';
+    else if (part === 'rm') el.textContent = r.rm || 'not listed';
     else if (part === 'joined') el.textContent = joined ? fmt(joined) : r.joined;
     else if (part === 'status') el.append(pill(r[step]));
     else if (part === 'due') {
@@ -627,7 +677,7 @@
     } else if (part === 'form') {
       const next = ['ph1', 'ph2', 'ph3', 'ph4'].find((k) => r[k] === 'Overdue' || r[k] === 'In progress');
       el.append(formLink({
-        id: r.id, name: r.name, store: r.store, city: r.city,
+        id: r.id, name: r.name, store: r.store, city: r.city, cm: r.cm,
         joined_iso: joined ? d3.utcFormat('%Y-%m-%d')(joined) : '',
         form_phase: next ? FORM_PHASE[next] : '',
       }, next ? 'Fill form for ' + FORM_PHASE[next] + ' ↗' : 'Open Google Form ↗'));
