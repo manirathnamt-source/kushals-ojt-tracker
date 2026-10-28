@@ -129,6 +129,21 @@
   .ojt-seg button { font: inherit; border: 0; border-radius: 999px; background: transparent; color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-md); cursor: pointer; transition: background .2s, color .2s; }
   .ojt-seg button[aria-pressed="true"] { background: var(--h); color: #fff; }
   .ojt-select { flex: 0 1 16rem; cursor: pointer; }
+
+  /* Filter bar: sticks under the top while scrolling */
+  .ojt-filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: grid; gap: var(--cds-gap-sm) var(--cds-gap-md);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10.5rem), 1fr)); align-items: end;
+    padding: var(--cds-pad-md) var(--cds-pad-lg); border-radius: calc(var(--cds-radius) * 1.5);
+    background: color-mix(in srgb, var(--color-panel) 92%, transparent); backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--k-brand) 25%, var(--color-border-line)); box-shadow: 0 8px 24px color-mix(in srgb, var(--k-brand) 10%, transparent); }
+  .ojt-filters .f-field { display: grid; gap: 4px; min-width: 0; }
+  .ojt-filters .f-wide { grid-column: span 2; }
+  .ojt-filters label { font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--k-brand); letter-spacing: .03em; }
+  .ojt-filters input, .ojt-filters select { font: inherit; width: 100%; min-width: 0; padding: var(--cds-pad-xs) var(--cds-pad-sm); border-radius: var(--cds-radius);
+    border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); }
+  .ojt-filters input:focus-visible, .ojt-filters select:focus-visible { outline: 2px solid var(--k-brand); outline-offset: 1px; }
+  .ojt-filters .f-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cds-gap-sm); grid-column: span 2; }
+  @media (max-width: 30rem) { .ojt-filters { position: static; } .ojt-filters .f-wide, .ojt-filters .f-actions { grid-column: auto; } }
   .ojt-dialog header .ojt-note b { color: #fff; font-weight: 600; }
   .ojt-search { font: inherit; padding: var(--cds-pad-xs) var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-bg); color: var(--color-fg); min-width: 0; flex: 1 1 12rem; }
 
@@ -191,11 +206,58 @@
     <a class="ojt-btn ojt-btn-primary" href="https://docs.google.com/forms/d/19p1i7jyQDljjacrHZlkSez-O1AfvlG_iNFvIVG-2oRk/viewform" target="_blank" rel="noopener">Update OJT form ↗</a>
   </header>
 
+  <section class="ojt-filters" id="filters" aria-label="Filters">
+    <div class="f-field f-date">
+      <label for="f-from">Joined from</label>
+      <input id="f-from" type="date">
+    </div>
+    <div class="f-field f-date">
+      <label for="f-to">Joined to</label>
+      <input id="f-to" type="date">
+    </div>
+    <div class="f-field">
+      <label for="f-rm">RM</label>
+      <select id="f-rm" data-draw="f-rm" data-source="staff"></select>
+    </div>
+    <div class="f-field">
+      <label for="f-cm">CM</label>
+      <select id="f-cm" data-draw="f-cm" data-source="staff"></select>
+    </div>
+    <div class="f-field f-wide">
+      <label for="f-store">Store</label>
+      <select id="f-store" data-draw="f-store" data-source="staff"></select>
+    </div>
+    <div class="f-field">
+      <label for="f-phase">Phase</label>
+      <select id="f-phase">
+        <option value="">All phases</option>
+        <option value="ph1">Phase 1 · Foundation</option>
+        <option value="ph2">Phase 2 · Internship</option>
+        <option value="assessment">Assessment</option>
+        <option value="ph3">Phase 3 · Advanced</option>
+        <option value="ph4">Phase 4 · Ownership</option>
+      </select>
+    </div>
+    <div class="f-field">
+      <label for="f-status">Phase status</label>
+      <select id="f-status">
+        <option value="">Any status</option>
+        <option value="pending">Not done yet</option>
+        <option value="Overdue">Overdue</option>
+        <option value="In progress">In progress</option>
+        <option value="Done">Done</option>
+      </select>
+    </div>
+    <div class="f-actions">
+      <button type="button" class="ojt-btn" id="f-reset">Reset</button>
+      <span class="ojt-note" data-draw="f-count" data-source="staff">—</span>
+    </div>
+  </section>
+
   <section class="ojt-card" id="todo">
     <h2>Pending OJT sign-offs</h2>
-    <p class="ojt-note">Active staff with a phase still to sign off, overdue first, then by due date. "Fill form" opens the OJT sign-off form with the employee's details, cluster manager and phase already filled in. The store manager adds the trainer, concerns and confirmation, then submits.</p>
+    <p class="ojt-note">Active staff with a phase still to sign off, overdue first, then by due date. With a phase picked in the filters, the table shows that phase. "Fill form" opens the OJT sign-off form with the employee's details, cluster manager and phase already filled in. The store manager adds the trainer, concerns and confirmation, then submits.</p>
     <div class="ojt-tools">
-      <select class="ojt-search ojt-select" data-draw="cm-filter" data-source="staff" aria-label="Cluster manager"></select>
       <span class="ojt-note">Showing <span data-draw="pending-shown" data-source="actions">—</span></span>
     </div>
     <div class="ojt-scroll">
@@ -294,7 +356,6 @@
         <button type="button" data-emp="Left" aria-pressed="false">Left</button>
         <button type="button" data-emp="All" aria-pressed="false">Everyone</button>
       </div>
-      <select class="ojt-search ojt-select" data-draw="cm-filter" data-source="staff" aria-label="Cluster manager"></select>
       <input id="ojt-q" class="ojt-search" type="search" placeholder="Search name, ID, store, CM or RM" aria-label="Search staff">
       <span class="ojt-note">Showing <span data-draw="shown" data-source="staff">—</span></span>
     </div>
@@ -350,9 +411,13 @@
   // Minimal stand-in for the dashboard's data API: one dataset (staff) from data.json,
   // calcs computed on demand, and named drawings re-run whenever data or width changes.
   window.dash = (() => {
-    const calcs = {}, draws = {}, cache = {};
+    const calcs = {}, draws = {};
+    let cache = {}, all = [], filter = null;
     let status = 'loading', meta = {};
     const api = {
+      allRows: () => all,
+      // Narrows the staff rows every calc and drawing reads, then redraws the page.
+      setFilter(fn) { filter = fn; cache = {staff: fn ? all.filter(fn) : all}; api.drawAll(); },
       calc(id, def) { calcs[id] = def; },
       data(id) {
         if (status !== 'ok') return {status, data: []};
@@ -366,7 +431,7 @@
       },
       drawAll() { Object.keys(draws).forEach((n) => api.draw(n)); },
       meta: () => meta,
-      load(doc) { cache.staff = doc.rows; meta = doc; status = 'ok'; api.drawAll(); },
+      load(doc) { all = doc.rows; meta = doc; status = 'ok'; cache = {staff: filter ? all.filter(filter) : all}; api.drawAll(); },
       fail() { status = 'error'; api.drawAll(); },
     };
     return api;
@@ -441,7 +506,9 @@
         ['ph3', 'Phase 3 · Advanced', 'Advanced', 45], ['ph4', 'Phase 4 · Ownership', 'Ownership', 60]];
       const rows = [];
       staff.filter((r) => r.employment === 'Active').forEach((r) => {
-        const p = P.find(([k]) => r[k] === 'Overdue' || r[k] === 'In progress');
+        // With a phase picked in the page filters, show that phase; otherwise the earliest one not done.
+        const pick = (window.__ojtFilters && window.__ojtFilters.phase) || '';
+        const p = P.find(([k]) => (!pick || k === pick) && (r[k] === 'Overdue' || r[k] === 'In progress'));
         if (!p) return;
         const [dd, mon, yy] = r.joined.split('-');
         const joined = new Date(Date.UTC(+yy, M[mon], +dd));
@@ -523,24 +590,76 @@
     }
   });
 
-  // Cluster manager filter, shared by the pending and staff tables.
   const NO_CM = '(not in reporting structure)';
-  const cmMatch = (r) => !window.__ojt.cm || (r.cm || NO_CM) === window.__ojt.cm;
+  const cmMatch = () => true; // CM is now one of the page-wide filters below
   const managerCell = (tr, v) => {
     const td = tr.insertCell(); td.textContent = v;
     if (!v) td.title = 'Store not found in the Retail Reporting Structure';
     return td;
   };
-  dash.draw('cm-filter', (sel) => {
-    const d = dash.data('staff');
-    const cms = d.status === 'ok' ? [...new Set(d.data.map((r) => r.cm || NO_CM))].sort() : [];
-    sel.replaceChildren(new Option('All cluster managers', ''), ...cms.map((c) => new Option(c, c)));
-    sel.value = window.__ojt.cm;
+
+  // Page-wide filters: joining date range, RM, CM, store, phase and its status.
+  // They narrow the staff rows every section is computed from (dash.setFilter on the GitHub page).
+  const F = window.__ojtFilters = {from: '', to: '', rm: '', cm: '', store: '', phase: '', status: ''};
+  const MON = {Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11};
+  const isoJoined = (s) => {
+    const [dd, mon, yy] = (s || '').split('-');
+    return MON[mon] === undefined ? '' : `${yy}-${String(MON[mon] + 1).padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  };
+  const PH_KEYS = ['ph1', 'ph2', 'assessment', 'ph3', 'ph4'];
+  const statusOk = (v) => !F.status || (F.status === 'pending' ? (v === 'Overdue' || v === 'In progress') : v === F.status);
+  const rowMatches = (r) => {
+    const j = isoJoined(r.joined);
+    if (F.from && (!j || j < F.from)) return false;
+    if (F.to && (!j || j > F.to)) return false;
+    if (F.rm && (r.rm || NO_CM) !== F.rm) return false;
+    if (F.cm && (r.cm || NO_CM) !== F.cm) return false;
+    if (F.store && r.store !== F.store) return false;
+    if (!F.status) return true;
+    if (F.phase) return statusOk(r[F.phase]);
+    // No phase picked: "Done" means all four phases done; anything else means any stage has that status.
+    return F.status === 'Done' ? ['ph1', 'ph2', 'ph3', 'ph4'].every((k) => r[k] === 'Done') : PH_KEYS.some((k) => statusOk(r[k]));
+  };
+  const allRows = () => (dash.allRows ? dash.allRows() : (dash.data('staff').data || []));
+  const filtersOn = () => Object.values(F).some(Boolean);
+  const applyFilters = () => {
+    if (dash.setFilter) dash.setFilter(filtersOn() ? rowMatches : null);
+    else dash.drawAll && dash.drawAll();
+  };
+  // Option lists narrow to what the other choices allow (e.g. CMs under the picked RM).
+  const optionDraw = (key, label, values) => (sel) => {
+    const rows = allRows().filter((r) => (key === 'rm' || !F.rm || (r.rm || NO_CM) === F.rm) && (key !== 'store' || !F.cm || (r.cm || NO_CM) === F.cm));
+    const opts = [...new Set(rows.map(values))].filter(Boolean).sort();
+    sel.replaceChildren(new Option(label, ''), ...opts.map((o) => new Option(o, o)));
+    if (F[key] && !opts.includes(F[key])) F[key] = '';
+    sel.value = F[key];
     sel.onchange = () => {
-      window.__ojt.cm = sel.value;
-      ['cm-filter', 'action-rows', 'pending-shown', 'staff-rows', 'shown'].forEach((n) => dash.draw(n));
+      F[key] = sel.value;
+      if (key === 'rm') { F.cm = ''; F.store = ''; }
+      if (key === 'cm') F.store = '';
+      applyFilters();
     };
+  };
+  dash.draw('f-rm', optionDraw('rm', 'All RMs', (r) => r.rm || NO_CM));
+  dash.draw('f-cm', optionDraw('cm', 'All CMs', (r) => r.cm || NO_CM));
+  dash.draw('f-store', optionDraw('store', 'All stores', (r) => r.store));
+  dash.draw('f-count', (el) => {
+    const d = dash.data('staff');
+    if (d.status !== 'ok') { el.textContent = '—'; return; }
+    const act = (rows) => rows.filter((r) => r.employment === 'Active').length;
+    el.textContent = filtersOn() ? `${act(d.data)} of ${act(allRows())} active staff match` : `All ${act(allRows())} active staff`;
   });
+  document.querySelectorAll('#f-from, #f-to').forEach((i) => i.addEventListener('change', () => { F[i.id === 'f-from' ? 'from' : 'to'] = i.value; applyFilters(); }));
+  document.querySelectorAll('#f-phase, #f-status').forEach((s) => s.addEventListener('change', () => {
+    F[s.id === 'f-phase' ? 'phase' : 'status'] = s.value;
+    if (s.id === 'f-phase' && s.value && !F.status) { F.status = 'pending'; document.querySelectorAll('#f-status').forEach((o) => { o.value = 'pending'; }); }
+    applyFilters();
+  }));
+  document.querySelectorAll('#f-reset').forEach((b) => b.addEventListener('click', () => {
+    Object.keys(F).forEach((k) => { F[k] = ''; });
+    document.querySelectorAll('#filters input, #filters select').forEach((c) => { c.value = ''; });
+    applyFilters();
+  }));
 
   const visibleActions = () => {
     const d = dash.data('actions');
