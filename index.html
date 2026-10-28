@@ -210,7 +210,7 @@
     <h1 id="top">Karnataka &amp; Kerala OJT tracker</h1>
     <p class="ojt-lede"><b data-draw="kpi" data-source="byState" data-field="all_done" data-where="state=Both">—</b> of <b data-draw="kpi" data-source="byState" data-field="active" data-where="state=Both">—</b> active staff have finished all four phases. <b data-draw="kpi" data-source="byState" data-field="overdue" data-where="state=Both">—</b> phase or assessment items are overdue.</p>
     <p class="ojt-note">Bangalore &amp; ROK market · RHR Pavan · RMs Mani &amp; Sathish. Phase 1 is due by day 7, Phase 2 by day 30, the assessment after Phase 2, Phase 3 by day 45 and Phase 4 by day 60, counted from the joining date.</p>
-    <p class="ojt-note ojt-updated">Data refreshed daily from the OJT sheet · last update <span data-draw="updated">—</span>
+    <p class="ojt-note ojt-updated"><span data-draw="source-label">Data from the OJT sheet</span> · loaded <span data-draw="updated">—</span>
       <button type="button" class="ojt-refresh" id="ojt-refresh" title="Reload the latest data" aria-label="Refresh data">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         <span>Refresh</span>
@@ -904,14 +904,70 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
 
+  const FEED_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4mYFlD-q5i0p_3HzGRkxfyOUzxw8rZSR3TgNwXwwXfJivJfVCkqBpbwx0Ra1FhjETobYXQtdo4Dv_/pub?gid=1148716804&single=true&output=csv";
+  const parseCsv = (t) => {
+    const rows = []; let row = [], f = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+      else f += c;
+    }
+    if (f || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  };
+  // Same rules as the old daily converter: short statuses, state/city from the store code, CM/RM by store.
+  const feedToRows = (text) => {
+    const [head, ...body] = parseCsv(text);
+    const col = (name, from = 0) => { const i = head.findIndex((h, j) => j >= from && h.trim().startsWith(name)); if (i < 0) throw new Error('Column not found: ' + name); return i; };
+    const C = {id: col('Emp ID'), name: col('Employee Name'), store: col('Store Name'), desig: col('Designation'), joined: col('Joining Date'),
+      p1: col('Phase 1 - Foundation Status'), p1d: col('Ph1 Sign-off Date'), p2: col('Phase 2 - Internship Status'), p2d: col('Ph2 Sign-off Date'),
+      score: col('Assessment Score'), astat: col('Assessment Status'), adate: col('Assessment Date'), elig: col('2nd Assessment Eligible'),
+      score2: col('2nd Assessment Score'), stat2: col('2nd Assessment Status'), p3: col('Phase 3 - Advanced Status'), p3d: col('Ph3 Sign-off Date'),
+      p4: col('Phase 4 - Ownership Status'), p4d: col('Ph4 Sign-off Date'), remarks: col('Remarks'), dol: col('DOL')};
+    const sStore = col('STORE NAME'), sCm = col('CLUSTER MANAGER'), sRm = col('REPORTING MANAGER');
+    const norm = (s) => (s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const ALIAS = {'INFANTRY ROAD - BELLARI': 'BLY - INFANTRY RAOD'};
+    const managers = new Map();
+    body.forEach((f) => { if ((f[sStore] || '').trim()) managers.set(norm(f[sStore]), {cm: (f[sCm] || '').trim(), rm: (f[sRm] || '').trim()}); });
+    const KERALA = ['KCH', 'TRV'];
+    const CITY = {BLR: 'Bengaluru', MYS: 'Mysuru', MGL: 'Mangaluru', HBL: 'Hubballi', KCH: 'Kochi', TRV: 'Thiruvananthapuram'};
+    const phase = (s) => { s = (s || '').trim(); return s === 'Done' ? 'Done' : s.startsWith('Left') ? 'Left' : s.includes('Overdue') ? 'Overdue' : 'In progress'; };
+    const assess = (s) => ({Complete: 'Done', Incomplete: 'Overdue', Pending: 'In progress'}[(s || '').trim()] || 'Left');
+    return body.filter((f) => /^\d+$/.test((f[C.id] || '').trim())).map((f) => {
+      const v = (k) => (f[C[k]] || '').trim();
+      const store = v('store'), code = store.split(' - ')[0].trim();
+      const m = managers.get(norm(ALIAS[norm(store)] || store)) || {cm: '', rm: ''};
+      return {id: v('id'), name: v('name'), store, state: KERALA.includes(code) ? 'Kerala' : 'Karnataka',
+        city: CITY[code] || (store.includes('Bellari') ? 'Ballari' : code), cm: m.cm, rm: m.rm,
+        designation: v('desig'), joined: v('joined'), employment: v('remarks') === 'Left' ? 'Left' : 'Active', left_on: v('dol'),
+        ph1: phase(v('p1')), ph1_signed: v('p1d'), ph2: phase(v('p2')), ph2_signed: v('p2d'),
+        assessment: assess(v('astat')), score: v('score'), assessment_date: v('adate'),
+        second_needed: v('elig') === 'Eligible' ? 'Yes' : 'No', second_score: v('score2'), second_status: v('stat2'),
+        ph3: phase(v('p3')), ph3_signed: v('p3d'), ph4: phase(v('p4')), ph4_signed: v('p4d')};
+    });
+  };
+
+
   dash.draw('updated', (el) => {
     const u = dash.meta().updated;
     el.textContent = u ? new Date(u).toLocaleString('en-IN', {day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit'}) : '—';
   });
+  dash.draw('source-label', (el) => {
+    const m = dash.meta();
+    el.textContent = m.live ? 'Live from the OJT sheet' : m.updated ? 'Saved copy of the OJT sheet (live feed unavailable)' : 'Data from the OJT sheet';
+  });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => dash.draw('stage-chart'), 150); });
-  const fetchData = () => fetch('data.json?v=' + Date.now(), {cache: 'no-store'})
+  // Live from the published sheet; falls back to the last saved data.json if the sheet can't be read.
+  const fromSaved = () => fetch('data.json?v=' + Date.now(), {cache: 'no-store'})
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  const fromSheet = () => fetch(FEED_URL + (FEED_URL.includes('?') ? '&' : '?') + 'cb=' + Date.now(), {cache: 'no-store'})
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then((t) => { const rows = feedToRows(t); if (rows.length < 20) throw new Error('feed too short'); return {updated: new Date().toISOString(), live: true, rows}; });
+  const fetchData = () => (FEED_URL ? fromSheet().catch(fromSaved) : fromSaved());
   fetchData()
     .then((doc) => dash.load(doc))
     .catch(() => {
@@ -934,7 +990,7 @@
     fetchData()
       .then((doc) => {
         dash.load(doc);
-        msg.textContent = doc.updated === before ? 'Already up to date' : 'Updated';
+        msg.textContent = doc.live ? 'Live data loaded' : (doc.updated === before ? 'Already up to date' : 'Updated');
       })
       .catch(() => { msg.textContent = 'Could not reach the data. Try again.'; })
       .finally(() => {
