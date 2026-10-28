@@ -39,7 +39,15 @@
   body { margin: 0; background: var(--color-bg); color: var(--color-fg); font: 15px/1.5 var(--font-anthropic-sans); }
   .ojt-page { max-width: 80rem; margin-inline: auto; padding-block: 1.25rem 3rem;
     padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  .ojt-hero .ojt-updated { color: rgba(255,255,255,.85); }
+  .ojt-hero .ojt-updated { color: rgba(255,255,255,.85); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .ojt-refresh { display: inline-flex; align-items: center; gap: .35rem; font: inherit; font-weight: 600; cursor: pointer; color: #fff;
+    padding: .2rem .7rem; border-radius: 999px; border: 1px solid rgba(255,255,255,.6); background: rgba(255,255,255,.16); transition: background .2s; }
+  .ojt-refresh:hover { background: rgba(255,255,255,.28); }
+  .ojt-refresh:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .ojt-refresh svg { width: 1rem; height: 1rem; }
+  .ojt-refresh[aria-busy="true"] svg { animation: ojt-spin .8s linear infinite; }
+  .ojt-refresh-msg { font-weight: 600; color: #fff; }
+  @keyframes ojt-spin { to { transform: rotate(360deg); } }
   .ojt-err { padding: 1rem; border-radius: 10px; background: color-mix(in srgb, var(--color-bad) 12%, var(--color-panel)); color: var(--color-bad); }
 
 
@@ -202,7 +210,13 @@
     <h1 id="top">Karnataka &amp; Kerala OJT tracker</h1>
     <p class="ojt-lede"><b data-draw="kpi" data-source="byState" data-field="all_done" data-where="state=Both">—</b> of <b data-draw="kpi" data-source="byState" data-field="active" data-where="state=Both">—</b> active staff have finished all four phases. <b data-draw="kpi" data-source="byState" data-field="overdue" data-where="state=Both">—</b> phase or assessment items are overdue.</p>
     <p class="ojt-note">Bangalore &amp; ROK market · RHR Pavan · RMs Mani &amp; Sathish. Phase 1 is due by day 7, Phase 2 by day 30, the assessment after Phase 2, Phase 3 by day 45 and Phase 4 by day 60, counted from the joining date.</p>
-    <p class="ojt-note ojt-updated">Data refreshed daily from the OJT sheet · last update <span data-draw="updated">—</span></p>
+    <p class="ojt-note ojt-updated">Data refreshed daily from the OJT sheet · last update <span data-draw="updated">—</span>
+      <button type="button" class="ojt-refresh" id="ojt-refresh" title="Reload the latest data" aria-label="Refresh data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span>Refresh</span>
+      </button>
+      <span class="ojt-refresh-msg" id="ojt-refresh-msg" role="status"></span>
+    </p>
     <a class="ojt-btn ojt-btn-primary" href="https://docs.google.com/forms/d/19p1i7jyQDljjacrHZlkSez-O1AfvlG_iNFvIVG-2oRk/viewform" target="_blank" rel="noopener">Update OJT form ↗</a>
   </header>
 
@@ -896,8 +910,9 @@
   });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => dash.draw('stage-chart'), 150); });
-  fetch('data.json?v=' + Date.now(), {cache: 'no-store'})
-    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  const fetchData = () => fetch('data.json?v=' + Date.now(), {cache: 'no-store'})
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  fetchData()
     .then((doc) => dash.load(doc))
     .catch(() => {
       dash.fail();
@@ -906,6 +921,28 @@
       m.textContent = 'The OJT data could not be loaded. Refresh the page; if it keeps failing, the daily update may not have run.';
       document.querySelector('.ojt')?.prepend(m);
     });
+
+  // Manual refresh: reloads the latest published data.json, keeping the current filters.
+  const btn = document.getElementById('ojt-refresh'), msg = document.getElementById('ojt-refresh-msg');
+  let msgTimer;
+  btn?.addEventListener('click', () => {
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    const before = dash.meta().updated;
+    btn.setAttribute('aria-busy', 'true');
+    msg.textContent = '';
+    const started = Date.now();
+    fetchData()
+      .then((doc) => {
+        dash.load(doc);
+        msg.textContent = doc.updated === before ? 'Already up to date' : 'Updated';
+      })
+      .catch(() => { msg.textContent = 'Could not reach the data. Try again.'; })
+      .finally(() => {
+        setTimeout(() => btn.removeAttribute('aria-busy'), Math.max(0, 600 - (Date.now() - started)));
+        clearTimeout(msgTimer);
+        msgTimer = setTimeout(() => { msg.textContent = ''; }, 4000);
+      });
+  });
 </script>
 </body>
 </html>
