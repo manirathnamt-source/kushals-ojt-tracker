@@ -938,7 +938,8 @@
     const phase = (s) => { s = (s || '').trim(); return s === 'Done' ? 'Done' : s.startsWith('Left') ? 'Left' : s.includes('Overdue') ? 'Overdue' : 'In progress'; };
     const assess = (s) => ({Complete: 'Done', Incomplete: 'Overdue', Pending: 'In progress'}[(s || '').trim()] || 'Left');
     return body.filter((f) => /^\d+$/.test((f[C.id] || '').trim())).map((f) => {
-      const v = (k) => (C[k] >= 0 && f[C[k]] || '').trim();
+      // The sheet writes dates as 01-Jun-26; the page expects 01-Jun-2026.
+      const v = (k) => (C[k] >= 0 && f[C[k]] || '').trim().replace(/^(\d{1,2}-[A-Za-z]{3})-(\d{2})$/, '$1-20$2');
       const store = v('store'), code = store.split(' - ')[0].trim();
       const m = managers.get(norm(ALIAS[norm(store)] || store)) || {cm: '', rm: ''};
       return {id: v('id'), name: v('name'), store, state: KERALA.includes(code) ? 'Kerala' : 'Karnataka',
