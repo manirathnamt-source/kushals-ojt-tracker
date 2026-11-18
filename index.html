@@ -921,12 +921,13 @@
   // Same rules as the old daily converter: short statuses, state/city from the store code, CM/RM by store.
   const feedToRows = (text) => {
     const [head, ...body] = parseCsv(text);
-    const col = (name, from = 0) => { const i = head.findIndex((h, j) => j >= from && h.trim().startsWith(name)); if (i < 0) throw new Error('Column not found: ' + name); return i; };
+    const find = (name) => head.findIndex((h) => h.trim().startsWith(name));
+    const col = (name) => { const i = find(name); if (i < 0) throw new Error('Column not found: ' + name); return i; };
     const C = {id: col('Emp ID'), name: col('Employee Name'), store: col('Store Name'), desig: col('Designation'), joined: col('Joining Date'),
       p1: col('Phase 1 - Foundation Status'), p1d: col('Ph1 Sign-off Date'), p2: col('Phase 2 - Internship Status'), p2d: col('Ph2 Sign-off Date'),
       score: col('Assessment Score'), astat: col('Assessment Status'), adate: col('Assessment Date'), elig: col('2nd Assessment Eligible'),
       score2: col('2nd Assessment Score'), stat2: col('2nd Assessment Status'), p3: col('Phase 3 - Advanced Status'), p3d: col('Ph3 Sign-off Date'),
-      p4: col('Phase 4 - Ownership Status'), p4d: col('Ph4 Sign-off Date'), remarks: col('Remarks'), dol: col('DOL')};
+      p4: col('Phase 4 - Ownership Status'), p4d: col('Ph4 Sign-off Date'), remarks: find('Remarks'), dol: find('DOL'), estat: find('Employee Status')};
     const sStore = col('STORE NAME'), sCm = col('CLUSTER MANAGER'), sRm = col('REPORTING MANAGER');
     const norm = (s) => (s || '').toUpperCase().replace(/\s+/g, ' ').trim();
     const ALIAS = {'INFANTRY ROAD - BELLARI': 'BLY - INFANTRY RAOD'};
@@ -937,12 +938,12 @@
     const phase = (s) => { s = (s || '').trim(); return s === 'Done' ? 'Done' : s.startsWith('Left') ? 'Left' : s.includes('Overdue') ? 'Overdue' : 'In progress'; };
     const assess = (s) => ({Complete: 'Done', Incomplete: 'Overdue', Pending: 'In progress'}[(s || '').trim()] || 'Left');
     return body.filter((f) => /^\d+$/.test((f[C.id] || '').trim())).map((f) => {
-      const v = (k) => (f[C[k]] || '').trim();
+      const v = (k) => (C[k] >= 0 && f[C[k]] || '').trim();
       const store = v('store'), code = store.split(' - ')[0].trim();
       const m = managers.get(norm(ALIAS[norm(store)] || store)) || {cm: '', rm: ''};
       return {id: v('id'), name: v('name'), store, state: KERALA.includes(code) ? 'Kerala' : 'Karnataka',
         city: CITY[code] || (store.includes('Bellari') ? 'Ballari' : code), cm: m.cm, rm: m.rm,
-        designation: v('desig'), joined: v('joined'), employment: v('remarks') === 'Left' ? 'Left' : 'Active', left_on: v('dol'),
+        designation: v('desig'), joined: v('joined'), employment: v('remarks') === 'Left' || v('estat').startsWith('Left') ? 'Left' : 'Active', left_on: v('dol'),
         ph1: phase(v('p1')), ph1_signed: v('p1d'), ph2: phase(v('p2')), ph2_signed: v('p2d'),
         assessment: assess(v('astat')), score: v('score'), assessment_date: v('adate'),
         second_needed: v('elig') === 'Eligible' ? 'Yes' : 'No', second_score: v('score2'), second_status: v('stat2'),
@@ -978,7 +979,7 @@
       document.querySelector('.ojt')?.prepend(m);
     });
 
-  // Manual refresh: reloads the latest published data.json, keeping the current filters.
+  // Manual refresh: reloads the latest data (live sheet, else data.json), keeping the current filters.
   const btn = document.getElementById('ojt-refresh'), msg = document.getElementById('ojt-refresh-msg');
   let msgTimer;
   btn?.addEventListener('click', () => {
@@ -999,6 +1000,20 @@
         msgTimer = setTimeout(() => { msg.textContent = ''; }, 4000);
       });
   });
+
+  // Auto refresh: re-read the sheet every 5 minutes while the tab is visible, and as soon as
+  // someone comes back to the tab after 1+ minute away. Skipped while a detail popup is open.
+  const AUTO_MS = 5 * 60 * 1000;
+  let lastLoad = Date.now(), autoBusy = false;
+  const autoRefresh = () => {
+    if (autoBusy || document.hidden || btn?.getAttribute('aria-busy') === 'true') return;
+    if ([...modals()].some((m) => !m.hidden)) return;
+    autoBusy = true;
+    fetchData().then((doc) => { dash.load(doc); lastLoad = Date.now(); }).catch(() => {}).finally(() => { autoBusy = false; });
+  };
+  btn?.addEventListener('click', () => { lastLoad = Date.now(); });
+  setInterval(() => { if (Date.now() - lastLoad >= AUTO_MS) autoRefresh(); }, 30 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastLoad >= 60 * 1000) autoRefresh(); });
 </script>
 </body>
 </html>
